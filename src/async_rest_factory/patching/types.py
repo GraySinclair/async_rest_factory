@@ -14,6 +14,12 @@ CfgPatcher = Callable[[Cfg], Cfg]
 class CfgPatch:
     """
     Declarative nested config update.
+
+    Example:
+        CfgPatch(
+            path=("query_template", "request_body", "size"),
+            value=2000,
+        )
     """
 
     path: Sequence[PathPart]
