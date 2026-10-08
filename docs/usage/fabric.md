@@ -9,7 +9,7 @@ These helpers are intentionally separated from the generic HTTP, auth, patching,
 ```python
 from async_rest_factory.fabric import (
     get_key_vault_secret,
-    load_rest_configs,
+    load_latest_watermarks,
     write_rows_to_lakehouse_json,
 )
 ```
@@ -38,9 +38,9 @@ This keeps the base package importable outside Fabric, while still allowing Fabr
 async_rest_factory/
     fabric/
         __init__.py
-        config_loader.py
         key_vault.py
         lakehouse_files.py
+        watermarks.py
 ```
 
 ---
@@ -50,13 +50,13 @@ async_rest_factory/
 ```python
 # async_rest_factory/fabric/__init__.py
 
-from async_rest_factory.fabric.config_loader import load_rest_configs
 from async_rest_factory.fabric.key_vault import get_key_vault_secret
 from async_rest_factory.fabric.lakehouse_files import write_rows_to_lakehouse_json
+from async_rest_factory.fabric.watermarks import load_latest_watermarks
 
 __all__ = [
-    "load_rest_configs",
     "get_key_vault_secret",
+    "load_latest_watermarks",
     "write_rows_to_lakehouse_json",
 ]
 ```
@@ -102,40 +102,23 @@ async def get_hubspot_auth_context() -> AuthContext:
 
 ---
 
-# Load REST configs
+# Load watermarks
 
-Use `load_rest_configs()` to load enabled REST configs from the Ops Lakehouse.
+Use `load_latest_watermarks()` to load the most recent watermark file from a Lakehouse folder.
 
 ```python
-from async_rest_factory.fabric import load_rest_configs
+from async_rest_factory.fabric import load_latest_watermarks
 
 
-configs = load_rest_configs("hubspot")
+watermarks = load_latest_watermarks("Files/hubspot/watermarks")
 ```
-
-This reads from:
-
-```sql
-Ops.collections.rest_calls
-```
-
-and filters to enabled rows for the requested source system.
 
 Expected behavior:
 
-- returns a list of config dictionaries
-- converts `query_template` from JSON string to Python dictionary when populated
-- returns `None` values instead of pandas `NaN`
-- raises `LookupError` when the Fabric query returns `None`
-
-## Example
-
-```python
-configs = load_rest_configs("intacct")
-
-for cfg in configs:
-    print(cfg["source_system"], cfg["table_name"])
-```
+- lists `.json` files in the folder, ignoring subfolders
+- picks the latest file by name, so use sortable names such as timestamps
+- returns the parsed JSON content of that file
+- returns `{}` when the folder cannot be listed or has no `.json` files
 
 ---
 
@@ -242,7 +225,6 @@ import aiohttp
 from async_rest_factory.auth import AuthContext, token_auth_context
 from async_rest_factory.fabric import (
     get_key_vault_secret,
-    load_rest_configs,
     write_rows_to_lakehouse_json,
 )
 from async_rest_factory.http import send_request
@@ -281,7 +263,17 @@ async def run_one_config(cfg: dict):
     )
 
 
-configs = load_rest_configs("hubspot")
+configs = [
+    {
+        "source_system": "hubspot",
+        "table_name": "deals",
+        "http_method": "POST",
+        "endpoint": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "query_template": {
+            "request_body": {"limit": 100},
+        },
+    },
+]
 
 for cfg in configs:
     path = await run_one_config(cfg)
@@ -297,7 +289,6 @@ The `fabric` subpackage should contain Fabric runtime concerns only.
 Good examples:
 
 ```text
-load configs from Ops Lakehouse
 fetch secrets with notebookutils credentials
 write files to Lakehouse Files
 ```

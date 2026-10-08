@@ -73,13 +73,11 @@ cfg = apply_patches(
 ```python
 from async_rest_factory.fabric import (
     get_key_vault_secret,
-    load_rest_configs,
     write_rows_to_lakehouse_json,
 )
 
 
 token = get_key_vault_secret("hubspot-api-token")
-configs = load_rest_configs("hubspot")
 
 path = write_rows_to_lakehouse_json(
     rows=rows,
